@@ -22,16 +22,15 @@ def test_oql_for_area():
 [timeout:600][out:xml][bbox:bbox:52.157942,0.068639,52.237230,0.184552];
 area(3600295355) -> .a;
 (
-node(area.a)["amenity"="library"];
-way(area.a)["amenity"="library"];
-rel(area.a)["amenity"="library"];
+nwr(area.a)["amenity"="library"];
 ) -> .b;
 (
-    rel(295355);
-    node.b[~"^(addr:housenumber|.*name.*)$"~".",i];
-    way.b[~"^(addr:housenumber|.*name.*)$"~".",i];
-    rel.b[~"^(addr:housenumber|.*name.*)$"~".",i];
-
+        rel(295355);
+    nwr(area.a)["wikidata"];
+    nwr(area.a)["addr:housenumber"];
+    nwr.b[~"^(addr:housenumber|.*name.*)$"~".",i];
+    nwr.b[~"^ref:"~"."];
+    
 );
 (._;>;);
 out;'''
@@ -44,30 +43,21 @@ out;'''
 [timeout:600][out:xml][bbox:bbox:52.157942,0.068639,52.237230,0.184552];
 area(3600295355) -> .a;
 (
-node(area.a)["admin_level"];
-way(area.a)["admin_level"];
-rel(area.a)["admin_level"];
-node(area.a)["amenity"~"^(arts_centre|astronomical_observatory|bar|clock|college|community_centre|concert_hall|conference_centre|courthouse|grave_yard|hospital|library|marketplace|monastery|music_venue)$"];
-way(area.a)["amenity"~"^(arts_centre|astronomical_observatory|bar|clock|college|community_centre|concert_hall|conference_centre|courthouse|grave_yard|hospital|library|marketplace|monastery|music_venue)$"];
-rel(area.a)["amenity"~"^(arts_centre|astronomical_observatory|bar|clock|college|community_centre|concert_hall|conference_centre|courthouse|grave_yard|hospital|library|marketplace|monastery|music_venue)$"];
+nwr(area.a)["admin_level"];
+nwr(area.a)["amenity"~"^(arts_centre|astronomical_observatory|bar|clock|college|community_centre|concert_hall|conference_centre|courthouse|grave_yard|hospital|library|marketplace|monastery|music_venue)$"];
 rel(area.a)["site"~"^(school|station|university)$"];
-node(area.a)["sport"];
-way(area.a)["sport"];
-rel(area.a)["sport"];
-node(area.a)["tourism"];
-way(area.a)["tourism"];
-rel(area.a)["tourism"];
+nwr(area.a)["sport"];
+nwr(area.a)["tourism"];
 rel(area.a)["type"~"^(bridge|site)$"];
-node(area.a)["waterway"="lock_gate"];
-way(area.a)["waterway"="lock_gate"];
-rel(area.a)["waterway"="lock_gate"];
+nwr(area.a)["waterway"="lock_gate"];
 ) -> .b;
 (
-    rel(295355);
-    node.b[~"^(addr:housenumber|.*name.*)$"~".",i];
-    way.b[~"^(addr:housenumber|.*name.*)$"~".",i];
-    rel.b[~"^(addr:housenumber|.*name.*)$"~".",i];
-
+        rel(295355);
+    nwr(area.a)["wikidata"];
+    nwr(area.a)["addr:housenumber"];
+    nwr.b[~"^(addr:housenumber|.*name.*)$"~".",i];
+    nwr.b[~"^ref:"~"."];
+    
 );
 (._;>;);
 out;'''

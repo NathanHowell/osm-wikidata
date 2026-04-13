@@ -1,6 +1,16 @@
-from matcher import matcher
-from matcher.model import Item, IsA, ItemCandidate
 import os.path
+
+import pytest
+
+from matcher import matcher
+from matcher.model import BadMatchFilter, Embassy, Item, IsA, ItemCandidate
+
+
+@pytest.fixture(autouse=True)
+def _empty_db_queries(monkeypatch):
+    """Stub model .query attributes so tests don't need a bound DB session."""
+    monkeypatch.setattr(BadMatchFilter, "query", [])
+    monkeypatch.setattr(Embassy, "query", [])
 
 class MockApp:
     config = {'DATA_DIR': os.path.normpath(os.path.split(__file__)[0] + '/../data')}
@@ -796,7 +806,7 @@ def test_church_pub_bad_match(monkeypatch):
     item = Item(entity=entity, tags=tags)
 
     def place_names():
-        return ['West Sussex']
+        return {'West Sussex'}
     monkeypatch.setattr(item, 'place_names', place_names)
 
     def mock_run_sql(cur, sql, debug):

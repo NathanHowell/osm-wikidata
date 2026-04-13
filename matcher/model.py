@@ -486,8 +486,9 @@ class Item(Base):
         tags = set()
         for qid in self.instanceof():
             for tag in wikidata.extra_keys.get(qid, []):
-                if tag:
-                    tags.add(tag[4:])
+                if not tag:
+                    continue
+                tags.add(tag[4:] if tag.startswith("Tag:") else tag)
 
         return tags
 

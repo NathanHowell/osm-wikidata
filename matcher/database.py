@@ -29,6 +29,7 @@ def init_app(app: flask.Flask, echo: bool = False) -> None:
     """Initialise application."""
     db_url = app.config["DB_URL"]
     engine = get_engine(db_url, echo=echo)
+    session.remove()
     session.configure(bind=engine)
 
     from .procrastinate_app import procrastinate_app

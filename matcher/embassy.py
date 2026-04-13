@@ -901,6 +901,9 @@ def from_name(name: str) -> model.Embassy | None:
             reverse_map[name] = i
             reverse_map[name.lower()] = i
 
+    if not reverse_map:
+        return None
+
     longest_first = sorted(reverse_map.keys(), key=len, reverse=True)
 
     name_pattern = (

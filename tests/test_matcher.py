@@ -8,9 +8,37 @@ from matcher.model import BadMatchFilter, Embassy, Item, IsA, ItemCandidate
 
 @pytest.fixture(autouse=True)
 def _empty_db_queries(monkeypatch):
-    """Stub model .query attributes so tests don't need a bound DB session."""
-    monkeypatch.setattr(BadMatchFilter, "query", [])
-    monkeypatch.setattr(Embassy, "query", [])
+    """Stub model .query so tests don't need a bound DB session.
+
+    Populates BadMatchFilter with the fixed list of rules that used to be
+    hardcoded in matcher/matcher.py before commit 653ae33 (April 2019)
+    moved them into the bad_match_filter table. The bad-match tests in
+    this file were written against that hardcoded behaviour.
+    """
+    # embassy.from_name works against a reverse map keyed on Embassy.names, so
+    # a minimal set of entries covering the countries these tests need is
+    # enough — test_embassy_no_match compares an Israel consulate against an
+    # OSM Switzerland consulate, so the matcher needs to recognise
+    # "Switzerland" as a country that isn't Israel.
+    monkeypatch.setattr(Embassy, "query", [
+        Embassy(item_id=39, label="Switzerland", names=["Switzerland"]),
+    ])
+    monkeypatch.setattr(BadMatchFilter, "query", [
+        BadMatchFilter(wikidata=w, osm=o) for w, o in [
+            ("man_made=windmill", "amenity=pub"),
+            ("building=school", "amenity=pub"),
+            ("amenity=market", "amenity=pub"),
+            ("historic=castle", "amenity=pub"),
+            ("amenity=lifeboat_station", "amenity=place_of_worship"),
+            ("amenity=place_of_worship", "amenity=pub"),
+            ("amenity=school", "amenity=place_of_worship"),
+            ("amenity=library", "amenity=place_of_worship"),
+            ("amenity=library", "amenity=pub"),
+            ("amenity=cinema", "amenity=fuel"),
+            ("amenity=place_of_worship", "amenity=cafe"),
+            ("man_made=monitoring_station", "amenity=townhall"),
+        ]
+    ])
 
 class MockApp:
     config = {'DATA_DIR': os.path.normpath(os.path.split(__file__)[0] + '/../data')}

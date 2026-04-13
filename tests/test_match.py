@@ -953,6 +953,9 @@ def test_check_for_match():
             ("good", "Folkestone services", [("sitelink", "enwiki")]),
             ("good", "Stop 24 services", [("label", "en"), ("extract", "enwiki")]),
         ],
+        "name strip operator": [
+            ("good", "Folkestone services", [("sitelink", "enwiki")]),
+        ],
     }
 
     endings = {"services"}
@@ -995,7 +998,10 @@ def test_match_operator_at_start_of_name():
     }
 
     wd_names = {"Gordano services": [("label", "en")]}
-    expect = {"name": [("good", "Gordano services", [("label", "en")])]}
+    expect = {
+        "name": [("good", "Gordano services", [("label", "en")])],
+        "name strip operator": [("good", "Gordano services", [("label", "en")])],
+    }
 
     assert match.check_for_match(osm_tags, wd_names) == expect
 

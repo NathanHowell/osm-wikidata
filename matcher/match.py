@@ -982,6 +982,9 @@ def check_for_match(
                 osm_key + " strip operator": name
                 for osm_key, name in names_strip_operator.items()
                 if any(c.isalpha() for c in name)
+                and not (
+                    name.strip().startswith("(") and name.strip().endswith(")")
+                )
             }
         )
 

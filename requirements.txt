@@ -14,7 +14,7 @@ termcolor
 ua-parser
 unidecode
 user-agents
-pattern
+inflect
 num2words
 Flask-WTF
 flask-sock

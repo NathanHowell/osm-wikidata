@@ -157,7 +157,7 @@ def clear_oauth_session() -> None:
     """Clear OAuth session."""
     g.user.osm_oauth_token = None
     g.user.osm_oauth_token_secret = None
-    database.session.commit()
+    db.session.commit()
     flask.session.pop("oauth_state", None)
     flask.session.pop("oauth_token", None)
     flask_login.logout_user()
@@ -199,7 +199,7 @@ def global_user() -> None:
     g.user.description = info["description"]
     g.user.img = info["img"]
 
-    database.session.commit()
+    db.session.commit()
 
 
 @app.before_request
@@ -273,7 +273,7 @@ def logout() -> Response:
     flask.session.pop("oauth_token", None)
     if g.user:
         g.user.osm_oauth_token = None
-        database.session.commit()
+        db.session.commit()
     flask_login.logout_user()
     flash("you are logged out")
     return redirect(next_url)
@@ -349,9 +349,9 @@ def oauth_callback() -> Response:
             osm_id=info["id"],
             osm_account_created=info["account_created"],
         )
-        database.session.add(user)
+        db.session.add(user)
         user.osm_oauth_token = token_as_json
-    database.session.commit()
+    db.session.commit()
     flask_login.login_user(user)
 
     next_page = session.get("next") or url_for("index")
@@ -497,7 +497,7 @@ def overpass_query(osm_type, osm_id):
 
 def save_timing(name, t0):
     timing = Timing(start=t0, path=request.full_path, name=name, seconds=time() - t0)
-    database.session.add(timing)
+    db.session.add(timing)
 
 
 @app.route("/update_tags/<osm_type>/<int:osm_id>", methods=["POST"])
@@ -514,7 +514,7 @@ def update_tags(osm_type, osm_id):
         for c in ItemCandidate.query.filter_by(osm_id=e["id"], osm_type=e["type"]):
             if "tags" in e:  # FIXME do something clever like delete the OSM candidate
                 c.tags = e["tags"]
-    database.session.commit()
+    db.session.commit()
 
     flash("tags updated")
 
@@ -546,8 +546,8 @@ def add_tags_post(osm_type, osm_id):
             user_id=g.user.id, osm_type=osm_type, osm_id=osm_id, candidates=candidates
         )
 
-        database.session.add(in_progress)
-    database.session.commit()
+        db.session.add(in_progress)
+    db.session.commit()
 
     # switch method from POST to GET
     return redirect(url_for(request.endpoint, **request.view_args))
@@ -632,7 +632,7 @@ def place_redirect(name):
 def get_bad_matches(place: Place) -> set[tuple[int, str, int]]:
     """Get bad matches from database."""
     q = (
-        database.session.query(
+        db.session.query(
             ItemCandidate.item_id, ItemCandidate.osm_type, ItemCandidate.osm_id
         )
         .join(BadMatch)
@@ -1211,7 +1211,7 @@ def candidates_json(osm_type: str, osm_id: int) -> Response:
     )
 
     place.match_cache = cache
-    database.session.commit()
+    db.session.commit()
 
     return jsonify(osm_type=osm_type, osm_id=osm_id, **cache)
 
@@ -1343,7 +1343,7 @@ def get_place(osm_type: str, osm_id: int) -> Place | Response:
     if place.state == "refresh_isa":
         place.load_isa()
         place.state = "ready"
-        database.session.commit()
+        db.session.commit()
 
     if place.state not in ("ready", "complete"):
         return place.redirect_to_matcher()
@@ -1432,7 +1432,7 @@ def refresh_place(osm_type: str, osm_id: int) -> Response:
     place.state = "refresh"
     place.language_count = None
     place.match_cache = None
-    database.session.commit()
+    db.session.commit()
 
     return place.redirect_to_matcher()
 
@@ -1747,7 +1747,7 @@ def get_tag_list(sort):
     count = func.count(distinct(Item.item_id))
     order_by = [count, ItemTag.tag_or_key] if sort == "count" else [ItemTag.tag_or_key]
     q = (
-        database.session.query(ItemTag.tag_or_key, func.count(distinct(Item.item_id)))
+        db.session.query(ItemTag.tag_or_key, func.count(distinct(Item.item_id)))
         .join(Item)
         .join(ItemCandidate)
         # .filter(ItemTag.tag_or_key == sub.c.tag_or_key)
@@ -1769,7 +1769,7 @@ def tag_list():
 def tag_page(tag_or_key):
     abort(404)
     sub = (
-        database.session.query(Item.item_id)
+        db.session.query(Item.item_id)
         .join(ItemTag)
         .join(ItemCandidate)
         .filter(ItemTag.tag_or_key == tag_or_key)
@@ -1790,8 +1790,8 @@ def bad_match(item_id, osm_type, osm_id):
         item_id=item_id, osm_type=osm_type, osm_id=osm_id, comment=comment, user=g.user
     )
 
-    database.session.add(bad)
-    database.session.commit()
+    db.session.add(bad)
+    db.session.commit()
     return Response("saved", mimetype="text/plain")
 
 
@@ -1901,7 +1901,7 @@ def build_item_page(wikidata_id: int, item: Item | None) -> str:
     if g.user.is_authenticated:
         if item:
             upload_option = any(not c.wikidata_tag for c in item.candidates)
-            q = database.session.query(BadMatch.item_id).filter(
+            q = db.session.query(BadMatch.item_id).filter(
                 BadMatch.item_id == item.item_id
             )
             if q.count():
@@ -1951,7 +1951,7 @@ def reports_view():
     if timestamp:
         q = EditMatchReject.query.filter_by(report_timestamp=timestamp)
         return render_template("reports/edit_match.html", q=q)
-    q = database.session.query(EditMatchReject.report_timestamp, func.count()).group_by(
+    q = db.session.query(EditMatchReject.report_timestamp, func.count()).group_by(
         EditMatchReject.report_timestamp
     )
     hide = request.args.get("hide")
@@ -1966,7 +1966,7 @@ def reports_view():
 def isa_list_report() -> str:
     """List of IsA items."""
     q = (
-        database.session.query(IsA.item_id, IsA.label, func.count())
+        db.session.query(IsA.item_id, IsA.label, func.count())
         .join(ItemIsA)
         .group_by(IsA.item_id, IsA.label)
         .order_by(func.count().desc())
@@ -1988,7 +1988,7 @@ def isa_item_refresh(isa_id: int) -> Response:
     item = IsA.query.get(isa_id)
     qid = f"Q{isa_id}"
     item.entity = wikidata_api.get_entity(qid)
-    database.session.commit()
+    db.session.commit()
     flash("IsA item refreshed")
     return redirect(url_for("isa_item_report", isa_id=isa_id))
 
@@ -2064,7 +2064,7 @@ def account_settings_page() -> Response | str:
 
     if form.validate_on_submit():
         form.populate_obj(g.user)
-        database.session.commit()
+        db.session.commit()
         flash("Account settings saved.")
         assert request.endpoint
         return redirect(url_for(request.endpoint))
@@ -2113,7 +2113,7 @@ def single_item_match(osm_type: str, osm_id: int, item_id: int) -> Response | st
     endings = matcher.get_ending_from_criteria(item.tags)
     endings |= item.more_endings_from_isa()
 
-    conn = database.session.bind.raw_connection()
+    conn = db.engine.raw_connection()
     cur = conn.cursor()
 
     candidates = matcher.find_item_matches(cur, item, place.prefix, debug=False)

@@ -6,6 +6,7 @@ import requests
 from flask import g
 
 from . import database, mail, osm_oauth, user_agent_headers
+from .database import db
 from .model import Changeset
 
 really_save = True
@@ -74,8 +75,8 @@ def record_changeset(**kwargs: dict) -> Changeset:
     """Save a changeset in the database."""
     change = Changeset(created=database.now_utc(), user=g.user, **kwargs)
 
-    database.session.add(change)
-    database.session.commit()
+    db.session.add(change)
+    db.session.commit()
 
     return change
 

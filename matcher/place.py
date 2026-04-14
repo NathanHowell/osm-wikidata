@@ -39,7 +39,7 @@ from . import (
     wikidata_api,
     wikipedia,
 )
-from .database import get_tables, now_utc, session
+from .database import db, get_tables, now_utc
 from .model import (
     Base,
     Changeset,
@@ -206,8 +206,8 @@ class Place(Base):
             return None
         place = Place.from_nominatim(hit)
         if place:
-            session.add(place)
-            session.commit()
+            db.session.add(place)
+            db.session.commit()
         return place
 
     @property
@@ -377,7 +377,7 @@ class Place(Base):
     def update_address(self):
         hit = nominatim.reverse(self.osm_type, self.osm_id, polygon_text=0)
         self.address = [dict(name=n, type=t) for t, n in hit["address"].items()]
-        session.commit()
+        db.session.commit()
 
     @property
     def name_for_change_comment(self):
@@ -469,8 +469,8 @@ class Place(Base):
                 place.update_from_nominatim(hit)
             else:
                 place = cls.from_nominatim(hit)
-                session.add(place)
-        session.commit()
+                db.session.add(place)
+        db.session.commit()
         return place
 
     @property
@@ -607,8 +607,8 @@ class Place(Base):
         for t in get_tables():
             if not t.startswith(self.prefix):
                 continue
-            session.execute(text(f"drop table if exists {t}"))
-        session.commit()
+            db.session.execute(text(f"drop table if exists {t}"))
+        db.session.commit()
 
         overpass_dir = current_app.config["OVERPASS_DIR"]
         for f in os.listdir(overpass_dir):
@@ -627,7 +627,7 @@ class Place(Base):
         if self.state != "ready":
             return
         return (
-            session.query(Item.item_id)
+            db.session.query(Item.item_id)
             .join(PlaceItem)
             .join(Place)
             .join(ItemCandidate)
@@ -913,7 +913,7 @@ class Place(Base):
                 item.location = v["location"]
             else:
                 item = Item(item_id=wikidata_id, location=v["location"])
-                session.add(item)
+                db.session.add(item)
             for k in "enwiki", "categories", "query_label":
                 if k in v:
                     setattr(item, k, v[k])
@@ -944,14 +944,14 @@ class Place(Base):
             existing = PlaceItem.query.filter_by(item=item, place=self).one_or_none()
             if not existing:
                 place_item = PlaceItem(item=item, place=self)
-                session.add(place_item)
+                db.session.add(place_item)
             debug(f"saved: {qid}")
 
         for item in self.items:
             if item.qid in seen:
                 continue
             link = PlaceItem.query.filter_by(item=item, place=self).one()
-            session.delete(link)
+            db.session.delete(link)
         debug("done")
 
         return seen
@@ -968,7 +968,7 @@ class Place(Base):
 
         self.save_items(items)
 
-        session.commit()
+        db.session.commit()
 
     def load_extracts(self, debug=False, progress=None):
         for code, _ in self.languages_wikidata():
@@ -995,7 +995,7 @@ class Place(Base):
 
     def wbgetentities(self, debug=False):
         sub = (
-            session.query(Item.item_id).join(ItemTag).group_by(Item.item_id).subquery()
+            db.session.query(Item.item_id).join(ItemTag).group_by(Item.item_id).subquery()
         )
         q = self.items.filter(Item.item_id == sub.c.item_id).options(
             load_only(Item.qid)
@@ -1085,7 +1085,7 @@ class Place(Base):
             for code, count in wikidata
         ]
         self.language_count = count
-        session.commit()
+        db.session.commit()
         return count
 
     def most_common_language(self):
@@ -1113,7 +1113,7 @@ class Place(Base):
 
         for place_item in place_items:
             place_item.done = False
-        session.commit()
+        db.session.commit()
 
     def matcher_query(self):
         return (
@@ -1134,7 +1134,7 @@ class Place(Base):
             def progress(candidates, item):
                 pass
 
-        conn = session.bind.raw_connection()
+        conn = db.engine.raw_connection()
         cur = conn.cursor()
 
         self.existing_wikidata = matcher.get_existing(cur, self.prefix)
@@ -1174,7 +1174,7 @@ class Place(Base):
                     continue  # foreign keys mean we can't remove saved candidates
                 if (c.osm_type, c.osm_id) not in as_set:
                     c.bad_matches.delete()
-                    session.delete(c)
+                    db.session.delete(c)
 
             if not candidates:
                 continue
@@ -1185,16 +1185,16 @@ class Place(Base):
                     c.update(i)
                 else:
                     c = ItemCandidate(**i, item=item)
-                    session.add(c)
+                    db.session.add(c)
 
             place_item.done = True
 
             if num % 100 == 0:
-                session.commit()
+                db.session.commit()
 
         self.item_count = self.items.count()
         self.candidate_count = self.items_with_candidates_count()
-        session.commit()
+        db.session.commit()
 
         conn.close()
 
@@ -1231,7 +1231,7 @@ class Place(Base):
                     download_isa.add(isa_qid)
                 if not isa:
                     isa = IsA(item_id=item_id)
-                    session.add(isa)
+                    db.session.add(isa)
                 isa_obj_map[isa_qid] = isa
                 isa_objects.append(isa)
             item = Item.query.get(qid[1:])
@@ -1240,7 +1240,7 @@ class Place(Base):
         for qid, entity in wikidata_api.entity_iter(download_isa):
             isa_obj_map[qid].entity = entity
 
-        session.commit()
+        db.session.commit()
 
     def do_match(self, debug=True):
         if self.state == "ready":  # already done
@@ -1250,7 +1250,7 @@ class Place(Base):
             print("load items")
             self.load_items()  # includes categories
             self.state = "tags"
-            session.commit()
+            db.session.commit()
 
         if self.state == "tags":
             print("wbgetentities")
@@ -1258,32 +1258,32 @@ class Place(Base):
             print("load extracts")
             self.load_extracts(debug=debug)
             self.state = "wbgetentities"
-            session.commit()
+            db.session.commit()
 
         if self.state in ("wbgetentities", "overpass_error", "overpass_timeout"):
             print("loading_overpass")
             self.get_overpass()
             self.state = "postgis"
-            session.commit()
+            db.session.commit()
 
         if self.state == "postgis":
             print("running osm2pgsql")
             self.load_into_pgsql(capture_stderr=False)
             self.state = "osm2pgsql"
-            session.commit()
+            db.session.commit()
 
         if self.state == "osm2pgsql":
             print("run matcher")
             self.run_matcher(debug=debug)
             self.state = "load_isa"
-            session.commit()
+            db.session.commit()
 
         if self.state == "load_isa":
             print("load isa")
             self.load_isa()
             print("ready")
             self.state = "ready"
-            session.commit()
+            db.session.commit()
 
     def get_overpass(self):
         oql = self.get_oql()
@@ -1370,7 +1370,7 @@ class Place(Base):
                 )
                 want_chunk = func.ST_Intersects(Place.geom, envelope(chunk))
                 want = (
-                    session.query(want_chunk)
+                    db.session.query(want_chunk)
                     .filter(Place.place_id == self.place_id)
                     .scalar()
                 )
@@ -1465,7 +1465,7 @@ class Place(Base):
             clip = func.ST_Intersection(Place.geom, envelope(chunk))
 
             geojson = (
-                session.query(func.ST_AsGeoJSON(clip, 4))
+                db.session.query(func.ST_AsGeoJSON(clip, 4))
                 .filter(Place.place_id == self.place_id)
                 .scalar()
             )
@@ -1484,12 +1484,12 @@ class Place(Base):
 
     def polygon_chunk(self, size=64):
         stmt = (
-            session.query(func.ST_Dump(Place.geom.cast(Geometry())).label("x"))
+            db.session.query(func.ST_Dump(Place.geom.cast(Geometry())).label("x"))
             .filter_by(place_id=self.place_id)
             .subquery()
         )
 
-        q = session.query(
+        q = db.session.query(
             stmt.c.x.path[1],
             func.ST_Area(stmt.c.x.geom.cast(Geography)) / (1000 * 1000),
             func.Box2D(stmt.c.x.geom),
@@ -1567,7 +1567,7 @@ class Place(Base):
         except nominatim.SearchError:
             return None  # FIXME: mail admin
         self.update_from_nominatim(hit)
-        session.commit()
+        db.session.commit()
 
     def is_in(self):
         if self.overpass_is_in:
@@ -1576,7 +1576,7 @@ class Place(Base):
         # self.overpass_is_in = overpass.is_in(self.overpass_type, self.osm_id)
         self.overpass_is_in = overpass.is_in_lat_lon(self.lat, self.lon)
         if self.overpass_is_in:
-            session.commit()
+            db.session.commit()
         return self.overpass_is_in
 
     def suggest_larger_areas(self):
@@ -1595,7 +1595,7 @@ class Place(Base):
             )
 
             q = func.ST_Area(box.cast(Geography))
-            bbox_area = session.query(q).scalar()
+            bbox_area = db.session.query(q).scalar()
             area_in_sq_km = bbox_area / (1000 * 1000)
 
             if area_in_sq_km < 10 or area_in_sq_km > 40_000:
@@ -1636,7 +1636,7 @@ class Place(Base):
                 if c.set_match_detail():
                     need_commit = True
         if need_commit:
-            session.commit()
+            db.session.commit()
 
         return items
 

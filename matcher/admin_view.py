@@ -1,6 +1,7 @@
 from flask import (Blueprint, abort, url_for, redirect, current_app, render_template,
                    request, flash, session)
 from . import database, utils, jobs
+from .database import db
 from .place import Place, PlaceMatcher
 from .model import SiteBanner, BadMatchFilter, User
 import flask_login
@@ -67,8 +68,8 @@ def admin_bad_match():
     if request.method == 'POST':
         item = BadMatchFilter(wikidata=request.form['wikidata'],
                               osm=request.form['osm'])
-        database.session.add(item)
-        database.session.commit()
+        db.session.add(item)
+        db.session.commit()
         return redirect(url_for('.admin_bad_match'))
     q = BadMatchFilter.query.order_by(BadMatchFilter.osm, BadMatchFilter.wikidata)
     return render_template('admin/bad_match.html', q=q)

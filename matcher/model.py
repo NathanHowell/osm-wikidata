@@ -14,7 +14,6 @@ from sqlalchemy import func
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import (
-    DeclarativeBase,
     DynamicMapped,
     Mapped,
     backref,
@@ -37,18 +36,11 @@ from . import (
     wikidata_api,
     wikipedia,
 )
-from .database import now_utc, session
+from .database import db, Base, now_utc
 from .overpass import oql_from_tag
 from .utils import capfirst
 
 re_lau_code = re.compile(r"^[A-Z]{2}([^A-Z].+)$")  # 'LAU (local administrative unit)'
-
-
-class Base(DeclarativeBase):
-    """Database model base class."""
-
-
-Base.query = session.query_property()
 
 
 osm_api_base = "https://api.openstreetmap.org/api/0.6"
@@ -474,7 +466,7 @@ class Item(Base):
         """Get lat/lon for item."""
         return typing.cast(
             tuple[float, float],
-            session.query(func.ST_Y(self.location), func.ST_X(self.location)).one(),
+            db.session.query(func.ST_Y(self.location), func.ST_X(self.location)).one(),
         )
 
     def get_osm_url(self, zoom=18, show_marker=False):
@@ -744,7 +736,7 @@ https://www.wikidata.org/wiki/{self.qid}
         self.extract_names = wikipedia.html_names(self.extract)
 
     def get_oql(self):
-        lat, lon = session.query(
+        lat, lon = db.session.query(
             func.ST_Y(self.location), func.ST_X(self.location)
         ).one()
         union = []
@@ -754,7 +746,7 @@ https://www.wikidata.org/wiki/{self.qid}
         return union
 
     def coords(self):
-        return session.query(func.ST_Y(self.location), func.ST_X(self.location)).one()
+        return db.session.query(func.ST_Y(self.location), func.ST_X(self.location)).one()
 
     def image_filenames(self) -> list[str]:
         """Image filenames for item."""
@@ -1602,7 +1594,7 @@ class Timing(Base):
 def get_bad(items):
     if not items:
         return {}
-    q = session.query(BadMatch.item_id).filter(
+    q = db.session.query(BadMatch.item_id).filter(
         BadMatch.item_id.in_([i.item_id for i in items])
     )
     return {item_id for item_id, in q}
@@ -1653,7 +1645,7 @@ class WikidataItem(Base):
         entity = wikidata_api.get_entity(qid)
         assert entity
         item = cls(item_id=item_id, rev_id=entity["lastrevid"], entity=entity)
-        session.add(item)
+        db.session.add(item)
         return item
 
     def update(self) -> None:
@@ -1669,7 +1661,7 @@ class WikidataItem(Base):
         entity = wikidata_api.get_entity(qid)
         assert entity
         item = cls(item_id=item_id, rev_id=entity["lastrevid"], entity=entity)
-        session.add(item)
+        db.session.add(item)
         return item
 
     @classmethod
@@ -1684,7 +1676,7 @@ class WikidataItem(Base):
         entity = wikidata_api.get_entity(qid)
         assert entity
         item = cls(item_id=item_id, rev_id=entity["lastrevid"], entity=entity)
-        session.add(item)
+        db.session.add(item)
         return item
 
 

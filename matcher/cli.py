@@ -57,7 +57,7 @@ def create_db():
     app.config.from_object("config.default")
     database.init_app(app)
 
-    Base.metadata.create_all(database.session.get_bind())
+    Base.metadata.create_all(db.engine)
 
 
 def get_place(place_identifier):
@@ -253,7 +253,7 @@ def mark_as_complete():
 
         if len(filtered) == 0:
             p.state = "complete"
-            database.session.commit()
+            db.session.commit()
             click.echo(len(filtered), p.display_name, "(updated)")
         else:
             click.echo(len(filtered), p.display_name)
@@ -318,7 +318,7 @@ def refresh_address():
             place.update_from_nominatim(hit)
 
             click.echo(hit["place_id"], list(hit["address"].items()))
-        database.session.commit()
+        db.session.commit()
 
         click.echo()
         sleep(10)
@@ -413,7 +413,7 @@ def polygons(place_identifier):
 
     chunk_size = utils.calc_chunk_size(place.area_in_sq_km)
     place_geojson = (
-        database.session.query(func.ST_AsGeoJSON(Place.geom, 4))
+        db.session.query(func.ST_AsGeoJSON(Place.geom, 4))
         .filter(Place.place_id == place.place_id)
         .scalar()
     )
@@ -428,7 +428,7 @@ def polygons(place_identifier):
         )
 
         chunk_geojson = (
-            database.session.query(func.ST_AsGeoJSON(clip, 4))
+            db.session.query(func.ST_AsGeoJSON(clip, 4))
             .filter(Place.place_id == place.place_id)
             .scalar()
         )
@@ -472,7 +472,7 @@ def print_create_table(tables):
     app.config.from_object("config.default")
     database.init_app(app)
 
-    engine = database.session.get_bind()
+    engine = db.engine
 
     for class_name in tables:
         cls = get_class(class_name)
@@ -507,12 +507,12 @@ def find_item_matches(place_identifier, qid):
     place = get_place(place_identifier)
     print(place.name_for_changeset)
 
-    conn = database.session.bind.raw_connection()
+    conn = db.engine.raw_connection()
     cur = conn.cursor()
     item_id = int(qid[1:])
     item = Item.query.get(item_id)
     item.refresh_extract_names()
-    database.session.commit()
+    db.session.commit()
     # print('isa:', [isa.label_and_qid() for isa in item.isa])
     if item.categories:
         print("categories:", item.categories)
@@ -591,7 +591,7 @@ def add_place_wikidata():
         place.wikidata = qid
 
     if need_commit:
-        database.session.commit()
+        db.session.commit()
 
 
 @app.cli.command()
@@ -725,12 +725,12 @@ def show_polygons(place_identifier):
 
     # select ST_Dump(geom::geometry) as poly from place where osm_id=1543125
     stmt = (
-        database.session.query(func.ST_Dump(Place.geom.cast(Geometry())).label("x"))
+        db.session.query(func.ST_Dump(Place.geom.cast(Geometry())).label("x"))
         .filter_by(place_id=place.place_id)
         .subquery()
     )
 
-    q = database.session.query(
+    q = db.session.query(
         stmt.c.x.path[1],
         func.ST_Area(stmt.c.x.geom.cast(Geography)) / (1000 * 1000),
         func.Box2D(stmt.c.x.geom),
@@ -826,8 +826,8 @@ def load_languages():
             v = mainsnak["datavalue"]["value"] if "datavalue" in mainsnak else None
             setattr(item, field, v)
         known_lang.add(item.wikimedia_language_code)
-        database.session.add(item)
-    database.session.commit()
+        db.session.add(item)
+    db.session.commit()
 
     print()
     print("adding language labels")
@@ -845,9 +845,9 @@ def load_languages():
             label = LanguageLabel(
                 item_id=item_id, wikimedia_language_code=k, label=v["value"]
             )
-            database.session.add(label)
+            db.session.add(label)
 
-        database.session.commit()
+        db.session.commit()
 
 
 @app.cli.command()
@@ -870,8 +870,8 @@ def populate_osm_candidate_table():
 
         fields = ["osm_id", "osm_type", "name", "tags"]
         c = OsmCandidate(**{k: getattr(ic, k) for k in fields})
-        database.session.merge(c)
-    database.session.commit()
+        db.session.merge(c)
+    db.session.commit()
 
 
 @app.cli.command()
@@ -886,7 +886,7 @@ def load_item_candidate_geom():
     database.init_app(app)
     tables = database.get_tables()
 
-    conn = database.session.bind.raw_connection()
+    conn = db.engine.raw_connection()
     cur = conn.cursor()
 
     q = ItemCandidate.query.filter(ItemCandidate.geom.is_(None))
@@ -909,9 +909,9 @@ def load_item_candidate_geom():
             c.geom = geom
             break
         if num % 100 == 0:
-            database.session.commit()
+            db.session.commit()
 
-    database.session.commit()
+    db.session.commit()
 
 
 @app.cli.command()
@@ -953,7 +953,7 @@ def suggest_larger_areas(place_identifier):
             4326,
         )
 
-        bbox_area = database.session.query(func.ST_Area(box.cast(Geography))).scalar()
+        bbox_area = db.session.query(func.ST_Area(box.cast(Geography))).scalar()
         area_in_sq_km = bbox_area / (1000 * 1000)
 
         if area_in_sq_km > 20_000:
@@ -1057,7 +1057,7 @@ def load_all_isa():
         print(place.display_name)
         place.load_isa()
         place.state = "ready"
-        database.session.commit()
+        db.session.commit()
 
     print("done")
 
@@ -1093,15 +1093,15 @@ def add_missing_edits():
                 (edit.item_id, edit.osm_id, edit.osm_type)
             )
             if item_candidate:
-                database.session.add(edit)
+                db.session.add(edit)
             else:
                 missing_count += 1
         print(changeset_id, len(edits), missing_count)
         try:
-            database.session.commit()
+            db.session.commit()
         except sqlalchemy.exc.IntegrityError:
             print("missing candidate")
-            database.session.rollback()
+            db.session.rollback()
 
 
 @app.cli.command()
@@ -1133,8 +1133,8 @@ def check_saved_edits():
             reject = EditMatchReject(
                 edit=edit, report_timestamp=report_timestamp, matcher_result=ret
             )
-            database.session.add(reject)
-            database.session.commit()
+            db.session.add(reject)
+            db.session.commit()
         except sqlalchemy.exc.StatementError:
             pprint(ret)
             raise
@@ -1173,7 +1173,7 @@ def db_now_utc():
     app.config.from_object("config.default")
     database.init_app(app)
 
-    q = database.session.query(func.timezone("utc", func.now()))
+    q = db.session.query(func.timezone("utc", func.now()))
     print(q.scalar())
 
 
@@ -1203,8 +1203,8 @@ def load_bad_match_filters(filename):
     database.init_app(app)
     for line in open(filename):
         i = BadMatchFilter(**json.loads(line))
-        database.session.add(i)
-    database.session.commit()
+        db.session.add(i)
+    db.session.commit()
 
 
 @app.cli.command()
@@ -1310,7 +1310,7 @@ def match_subregions(qid):
                 print("updating:", p["qid"], p["label"])
                 if place.state == "ready":
                     place.state = "refresh"
-                    database.session.commit()
+                    db.session.commit()
                 print(f"{num + 1}/{place_count}  {p['qid']} {p['label']}")
                 update_place(place)
 
@@ -1325,7 +1325,7 @@ def matcher_update_place(place_identifier):
 
     if place.state == "ready":
         place.state = "refresh"
-        database.session.commit()
+        db.session.commit()
     update_place(place)
 
 
@@ -1338,7 +1338,7 @@ def place_filter(place_identifier, want_isa):
     print()
     if place.state == "ready":
         place.state = "refresh"
-        database.session.commit()
+        db.session.commit()
 
     update_place(place, want_isa=want_isa.split(","))
 
@@ -1365,7 +1365,7 @@ def place_filter_file(filename, want_isa):
         print()
         if place.state == "ready":
             place.state = "refresh"
-            database.session.commit()
+            db.session.commit()
 
         update_place(place, want_isa=want_isa.split(","))
 
@@ -1466,7 +1466,7 @@ def import_place(filename):
     place = Place(**{key: data["place"][key] for key in place_fields})
     geojson = json.dumps(data["place"]["geom"])
     place.geom = func.ST_GeomFromGeoJSON(geojson)
-    database.session.add(place)
+    db.session.add(place)
 
     for isa_data in data["isa"]:
         item_id = isa_data["item_id"]
@@ -1476,7 +1476,7 @@ def import_place(filename):
                 setattr(isa, key, isa_data[key])
         else:
             isa = IsA(**{key: isa_data[key] for key in isa_fields})
-            database.session.add(isa)
+            db.session.add(isa)
 
     for item_data in data["items"]:
         item_id = item_data["item_id"]
@@ -1486,7 +1486,7 @@ def import_place(filename):
         )
         for isa_id in item_data["isa"]:
             item_isa = ItemIsA(item_id=item_id, isa_id=isa_id)
-            database.session.add(item_isa)
+            db.session.add(item_isa)
         place.items.append(item)
 
         for candidate_data in item_data["candidates"]:
@@ -1494,9 +1494,9 @@ def import_place(filename):
             candidate = ItemCandidate(item_id=item_id, **this)
             geojson = json.dumps(candidate_data["geom"])
             candidate.geom = func.ST_GeomFromGeoJSON(geojson)
-            database.session.add(candidate)
+            db.session.add(candidate)
 
-    database.session.commit()
+    db.session.commit()
 
 
 @app.cli.command()
@@ -1513,9 +1513,9 @@ def load_page_banners(filename):
         seen.add(qid)
         d["item_id"] = int(d.pop("qid")[1:])
         banner = PageBanner(**d)
-        database.session.add(banner)
+        db.session.add(banner)
 
-    database.session.commit()
+    db.session.commit()
 
 
 @app.cli.command()
@@ -1615,8 +1615,8 @@ def load_embassy_list(filename):
     for i in data:
         i["item_id"] = int(i.pop("qid")[1:])
         e = Embassy(**i)
-        database.session.add(e)
-    database.session.commit()
+        db.session.add(e)
+    db.session.commit()
 
 
 @app.cli.command()

@@ -6,6 +6,7 @@ import flask
 import humanize
 
 from . import database, mail, model, utils
+from .database import db
 
 
 def check_free_space(config: flask.config.Config | None = None) -> None:
@@ -46,5 +47,5 @@ There is currently {readable} available.
     mail.send_mail(subject, body, config=config)
 
     alert = model.SpaceWarning(free_space=free_space)
-    database.session.add(alert)
-    database.session.commit()
+    db.session.add(alert)
+    db.session.commit()

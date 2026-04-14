@@ -4,6 +4,7 @@ import typing
 from flask import current_app, g, request, session, url_for
 
 from . import database, nominatim
+from .database import db
 from .model import PageBanner
 from .place import Place
 
@@ -175,7 +176,7 @@ def update_search_results(results: NominatimResults) -> None:
             if "error" in db_place_hit or "place_id" not in db_place_hit:
                 # place deleted from OSM
                 if p.osm_type == "node":
-                    database.session.delete(p)
+                    db.session.delete(p)
                 # FIXME: mail admin if place isn't a node on OSM
             else:
                 p.place_id = db_place_hit["place_id"]
@@ -192,10 +193,10 @@ def update_search_results(results: NominatimResults) -> None:
                 p.update_from_nominatim(hit)
             else:
                 p = Place.from_nominatim(hit)
-                database.session.add(p)
+                db.session.add(p)
             need_commit = True
     if need_commit:
-        database.session.commit()
+        db.session.commit()
 
 
 def is_place_identifier(q: str) -> bool:

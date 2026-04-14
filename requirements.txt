@@ -1,4 +1,5 @@
 Flask
+Flask-SQLAlchemy
 flask-login
 GeoAlchemy2
 geopy

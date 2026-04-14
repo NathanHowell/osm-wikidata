@@ -127,8 +127,8 @@ def place_from_nominatim(hit: dict[str, typing.Any]) -> Place | None:
         p.update_from_nominatim(hit)
     else:
         p = Place.from_nominatim(hit)
-        database.session.add(p)
-    database.session.commit()
+        db.session.add(p)
+    db.session.commit()
     assert isinstance(p, Place) or p is None
     return p
 
@@ -229,8 +229,8 @@ class BrowseDetail:
                 continue
             isa_obj = IsA(item_id=int(isa_qid[1:]), entity=entity)
             self.isa_map[isa_qid] = isa_obj
-            database.session.add(isa_obj)
-        database.session.commit()
+            db.session.add(isa_obj)
+        db.session.commit()
 
     def build_isa_map(self, rows: list[wikidata.Row]) -> None:
         """Build a map of IsA item QIDs to Wikidata objects."""

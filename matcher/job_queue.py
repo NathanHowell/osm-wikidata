@@ -15,6 +15,7 @@ import requests.exceptions
 from sqlalchemy import text
 
 from matcher import database, mail, model, overpass, space_alert, wikidata_api, wikipedia
+from matcher.database import db
 from matcher.place import Place, PlaceMatcher, bbox_chunk
 from matcher.view import app
 
@@ -182,8 +183,8 @@ class MatcherJob:
         assert self.place
         gis_tables = self.place.gis_tables
         for t in gis_tables & set(database.get_tables()):
-            database.session.execute(text(f"drop table if exists {t}"))
-        database.session.commit()
+            db.session.execute(text(f"drop table if exists {t}"))
+        db.session.commit()
         assert not self.place.gis_tables & set(database.get_tables())
 
     def prepare_for_refresh(self, is_refresh: bool = False) -> None:
@@ -197,7 +198,7 @@ class MatcherJob:
         self.place.reset_all_items_to_not_done()
         self.drop_database_tables()
         self.place.refresh_nominatim()
-        database.session.commit()
+        db.session.commit()
 
     def overpass_chunk_error(self, chunk: Chunk) -> bool | None:
         """Check if an overpass chunk contains an error."""
@@ -288,7 +289,7 @@ class MatcherJob:
             db_items = {item.qid: item for item in self.place.items}
             self.get_item_detail(db_items)
             self.place.wikidata_items_retrieved_at = datetime.now(timezone.utc)
-            database.session.commit()
+            db.session.commit()
 
         db_items = {item.qid: item for item in self.place.items}
         item_count = len(db_items)
@@ -348,8 +349,8 @@ class MatcherJob:
             user_agent=self.user_agent,
             is_refresh=is_refresh,
         )
-        database.session.add(run_obj)
-        database.session.flush()
+        db.session.add(run_obj)
+        db.session.flush()
 
         self.log_file = run_obj.open_log_for_writes()
 
@@ -358,7 +359,7 @@ class MatcherJob:
 
         run_obj.complete()
         self.place.state = "ready"
-        database.session.commit()
+        db.session.commit()
         print(run_obj.start, run_obj.end)
 
         print("sending done")
@@ -452,7 +453,7 @@ class MatcherJob:
                     break
                 except wikidata_api.QueryTimeout:
                     place.wikidata_query_timeout = True
-                    database.session.commit()
+                    db.session.commit()
                     chunk_size = 2
                     msg = "wikidata query timeout, retrying with smaller chunks."
                     self.status(msg)

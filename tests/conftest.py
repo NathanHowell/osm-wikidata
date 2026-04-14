@@ -6,6 +6,7 @@ from sqlalchemy import text
 from testing.postgresql import Postgresql
 
 from matcher import database
+from matcher.database import db
 from matcher.model import Base, Item  # noqa: F401
 from matcher.place import Place  # noqa: F401
 
@@ -45,11 +46,10 @@ def app(request, postgresql):
     ctx = app.app_context()
     ctx.push()
 
-    engine = database.session.get_bind()
-    with engine.begin() as conn:
+    with db.engine.begin() as conn:
         conn.execute(text("create extension if not exists postgis"))
         conn.execute(text("create extension if not exists hstore"))
-    Base.metadata.create_all(engine)
+    db.create_all()
 
     yield app
 

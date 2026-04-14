@@ -22,7 +22,7 @@ def _empty_db_queries(monkeypatch):
     # "Switzerland" as a country that isn't Israel.
     monkeypatch.setattr(Embassy, "query", [
         Embassy(item_id=39, label="Switzerland", names=["Switzerland"]),
-    ])
+    ], raising=False)
     monkeypatch.setattr(BadMatchFilter, "query", [
         BadMatchFilter(wikidata=w, osm=o) for w, o in [
             ("man_made=windmill", "amenity=pub"),
@@ -38,7 +38,7 @@ def _empty_db_queries(monkeypatch):
             ("amenity=place_of_worship", "amenity=cafe"),
             ("man_made=monitoring_station", "amenity=townhall"),
         ]
-    ])
+    ], raising=False)
 
 class MockApp:
     config = {'DATA_DIR': os.path.normpath(os.path.split(__file__)[0] + '/../data')}

@@ -14,6 +14,7 @@ from lxml import etree
 from sqlalchemy.orm.attributes import flag_modified
 
 from . import database, edit, mail
+from .database import db
 from .model import ChangesetEdit, ItemCandidate
 from .place import Place
 
@@ -163,7 +164,7 @@ def check_if_already_tagged(r, osm) -> bool:
 
     osm.tags["wikidata"] = existing.get("v")
     flag_modified(osm, "tags")
-    database.session.commit()
+    db.session.commit()
     return True
 
 
@@ -199,8 +200,8 @@ def save_changeset_edit(m, changeset_id):
         osm_id=m["osm_id"],
         osm_type=m["osm_type"],
     )
-    database.session.add(db_edit)
-    database.session.commit()
+    db.session.add(db_edit)
+    db.session.commit()
 
 
 def edit_failed(r, e, element_data):
@@ -208,7 +209,7 @@ def edit_failed(r, e, element_data):
     if e.response.status_code == 409 and "Version mismatch" in r.text:
         raise VersionMismatch
     mail.error_mail("error saving element", element_data.decode("utf-8"), e.response)
-    database.session.commit()
+    db.session.commit()
 
 
 def process_match(changeset_id, m):
@@ -253,7 +254,7 @@ def handle_match(change, num, m):
             break
     if result == "saved":
         change.update_count += 1
-    database.session.commit()
+    db.session.commit()
     return result
 
 
@@ -288,7 +289,7 @@ def add_tags(ws_sock, osm_type, osm_id):
 
     # clear the match cache
     place.match_cache = None
-    database.session.commit()
+    db.session.commit()
 
     changeset_id = reply
     send("open", id=int(changeset_id))
@@ -311,7 +312,7 @@ def add_tags(ws_sock, osm_type, osm_id):
 
     # make sure the match cache is cleared
     place.match_cache = None
-    database.session.commit()
+    db.session.commit()
 
 
 @sock.route("/websocket/add_tags/<osm_type>/<int:osm_id>")

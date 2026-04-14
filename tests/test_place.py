@@ -1,6 +1,7 @@
 from matcher.model import Item
 from matcher.place import Place
 from matcher import database
+from matcher.database import db
 
 def simple_place():
     place = Place(place_id=1,
@@ -30,8 +31,8 @@ def test_add_tags_to_items(app):
                 location='Point(-2.62071 51.454)',
                 categories=['Museums'])
     place.items.append(item)
-    database.session.add(place)
-    database.session.commit()
+    db.session.add(place)
+    db.session.commit()
 
     place.add_tags_to_items()
     expect = {

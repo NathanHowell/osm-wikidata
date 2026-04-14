@@ -13,6 +13,7 @@ import psycopg2
 from flask import current_app
 
 from . import database, embassy, match, model, wikidata
+from .database import db
 
 
 class EntityType(typing.TypedDict):
@@ -1066,7 +1067,7 @@ def check_item_candidate(
 
 def run_individual_match(prefix: str, item: model.Item) -> list[CandidateDict]:
     """Run matcher for individual item."""
-    conn = database.session.bind.raw_connection()
+    conn = db.engine.raw_connection()
     cur = conn.cursor()
 
     candidates = find_item_matches(cur, item, prefix, debug=False)

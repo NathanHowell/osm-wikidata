@@ -2,43 +2,35 @@ import typing
 
 import flask
 import sqlalchemy
-from sqlalchemy import DATETIME, create_engine, func, text
-from sqlalchemy.engine import reflection
-from sqlalchemy.orm import scoped_session, sessionmaker
-
-session: sqlalchemy.orm.scoping.scoped_session = scoped_session(sessionmaker())
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import DATETIME, func, inspect, text
+from sqlalchemy.orm import DeclarativeBase
 
 
-def init_db(db_url: str) -> None:
-    """Initial database with the given URL."""
-    session.configure(bind=get_engine(db_url))
+class Base(DeclarativeBase):
+    """Database model base class."""
 
 
-def get_engine(db_url: str, echo: bool = False) -> sqlalchemy.engine.base.Engine:
-    """Create an engine with the given URL."""
-    return create_engine(db_url, pool_recycle=3600, echo=echo)
+db = SQLAlchemy(model_class=Base)
 
 
 def get_tables() -> list[str]:
     """Get list of table names."""
-    names: list[str] = reflection.Inspector.from_engine(session.bind).get_table_names()
-    return names
+    return inspect(db.engine).get_table_names()
 
 
 def init_app(app: flask.Flask, echo: bool = False) -> None:
     """Initialise application."""
-    db_url = app.config["DB_URL"]
-    engine = get_engine(db_url, echo=echo)
-    session.remove()
-    session.configure(bind=engine)
+    app.config.setdefault("SQLALCHEMY_DATABASE_URI", app.config["DB_URL"])
+    app.config.setdefault(
+        "SQLALCHEMY_ENGINE_OPTIONS", {"pool_recycle": 3600, "echo": echo}
+    )
+    db.init_app(app)
 
     from .procrastinate_app import procrastinate_app
 
-    procrastinate_app.open(engine)
-
-    @app.teardown_appcontext
-    def shutdown_session(exception: Exception | None = None) -> None:
-        session.remove()
+    with app.app_context():
+        procrastinate_app.open(db.engine)
 
 
 def get_old_place_list():
@@ -55,7 +47,8 @@ place_matcher ON place_matcher.osm_id = place.osm_id and place_matcher.osm_type 
 where a.place_id = place.place_id and start < CURRENT_DATE - INTERVAL '2 months'
 group by place.place_id, place.added, display_name, state, size order by start desc"""
 
-    return session.bind.execute(text(sql))
+    with db.engine.connect() as conn:
+        return conn.execute(text(sql)).all()
 
 
 def get_big_table_list():
@@ -74,9 +67,8 @@ place_matcher ON place_matcher.osm_id = place.osm_id and place_matcher.osm_type 
 where a.place_id = place.place_id
 group by place.place_id, place.added, display_name, state, size order by size desc;"""
 
-    engine = session.bind
-
-    return engine.execute(text(sql_big_polygon_tables))
+    with db.engine.connect() as conn:
+        return conn.execute(text(sql_big_polygon_tables)).all()
 
 
 DateTimeFunc = sqlalchemy.sql.functions.Function[DATETIME]

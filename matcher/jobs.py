@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 
 from . import database
+from .database import db
 from .place import Place
 
 StrDict = dict[str, typing.Any]
@@ -31,7 +32,7 @@ _ACTIVE_JOBS_SQL = text(
 
 def get_jobs() -> list[StrDict]:
     """Return active matcher jobs as a list of dicts suitable for the admin UI."""
-    rows = database.session.execute(
+    rows = db.session.execute(
         _ACTIVE_JOBS_SQL, {"task_name": MATCHER_TASK_NAME}
     ).fetchall()
 

@@ -11,13 +11,6 @@ from matcher.model import Base, Item  # noqa: F401
 from matcher.place import Place  # noqa: F401
 
 
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers",
-        "integration: marks tests requiring a real osm2pgsql binary on PATH",
-    )
-
-
 @pytest.fixture(scope="session")
 def postgresql(request):
     psql = Postgresql()
